@@ -94,7 +94,8 @@ def add_locations_column_and_update_marked_segment(df):
             elif not pd.isnull(row['phone_number']):
                 counts = match_field_count(df, index, row, 'phone_number', counts)
             else:
-                print("no match for {} on company name, phone number and website".format())       
+                counts[index] == 1
+                print("no match for {} on company name, phone number and website".format(row['company']))       
                           
             # # if there is more than one location and "Organisatie" as marked segment, update with correct segment
             # if (counts[index] > 1) and (str(row['marked_segment']) == 'Organisatie'):
@@ -106,7 +107,7 @@ def add_locations_column_and_update_marked_segment(df):
     
 def drop_non_main_locations(df):
     # Drop rows where is_main_location is False
-    df = df[df['is_main_location']]
+    df = df[df['is_main_location']].copy()
     df.drop('is_main_location', axis=1, inplace=True)
     return df
 
@@ -124,10 +125,50 @@ def clean_website(df):
     df['website'] = df['website'].str.extract(r'([a-zA-Z0-9-]+\.[a-zA-Z]+)', expand=False)
 
     return df
+
+def update_main_location(df):
+    filtered_rows = df[(df['marked_segment'] == 'Organisatie') & (df['nr_of_locations'] > 1)]
+    associated_locations = None
+    for _, row in filtered_rows.iterrows():
+        if not pd.isnull(row['website']):
+            associated_locations = df[df['website'] == row['website']]
+        
+        elif not pd.isnull(row['phone_number']):
+            associated_locations = df[df['phone_number'] == row['phone_number']]
+
+        else:
+            return
+        
+        if associated_locations is not None:
+            for _, associated_row in associated_locations.iterrows():
+                if associated_row['marked_segment'] == 'Organisatie':
+                    df.at[associated_row.name, 'is_main_location'] = True
+                else:
+                    df.at[associated_row.name, 'is_main_location'] = False
+
+
+
+def keep_unique_field_with_shortest_company_name(df, field):
+        # DataFrame with non-NaN and non-empty 'website' values
+    df_without_nan = df[df[field].notna() & (df[field] != '')]
+
+    # DataFrame with NaN or empty field values
+    df_with_nan = df[df[field].isna() | (df[field] == '')]
     
+    df_sorted = df_without_nan.sort_values(by='company', key=lambda x: x.str.len())
+    df_unique = df_sorted.drop_duplicates(subset=field, keep='first')
+
+    df_result = pd.concat([df_unique, df_with_nan])
+    
+    return df_result
+
+
+
 def main():
-    file_name = 'output'
-    output_id = "_website_count"
+    # file_name = 'output'
+    # output_id = "_website_count"
+    file_name = 'test_output'
+    output_id = ""
 
     file_in = file_name + ".csv"
     file_out = file_name + output_id +'_processed.csv'
@@ -144,7 +185,14 @@ def main():
     
     add_locations_column_and_update_marked_segment(df)
     
-    df = drop_non_main_locations(df)
+    update_main_location(df)
+
+    df = drop_non_main_locations(df) # these are safe to drop
+
+    # these work not properly! (before we drop them, we should have updated the nr_of_locations!)
+    # df = keep_unique_field_with_shortest_company_name(df, 'website')
+
+    # df = keep_unique_field_with_shortest_company_name(df, 'phone_number')
     
     df.to_csv(file_out, index=False)
     
