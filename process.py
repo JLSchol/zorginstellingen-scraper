@@ -16,13 +16,18 @@ def remove_website_from_phone_nr(df):
 def clean_phone_number(df):
     df['phone_number'] = df['phone_number'].replace('[^0-9]', '', regex=True)
     
-def is_main_location_in_company(row):
+def is_main_location_based_on_company_name(row):
     if 'Woonlocatie ' in row['company']:
         return False
     elif 'locatie ' in row['company']:
         return False
     else:
         return True
+    
+# def is_main_location_based_on_marked_segment_and_number(df, row):
+#     if row['marked_segment'] == 'Organisatie':
+#         match_partial_str_count(df, )
+#         # check if name
 
 def add_is_main_location_column(df, fn):
     # Apply the function to create a new column 'branch_type'
@@ -79,21 +84,22 @@ def add_locations_column_and_update_marked_segment(df):
 
     # Iterate through the DataFrame
     for index, row in df.iterrows():
+        print("processing row " + str(index))
 
         if row['is_main_location']:
-            if not pd.isnull(row['company']):
+            if not pd.isnull(row['website']):
+                counts = match_field_count(df, index, row, 'website', counts)
+            elif not pd.isnull(row['company']):
                 counts = match_partial_str_count(df, index, row, 'company', counts)
             elif not pd.isnull(row['phone_number']):
                 counts = match_field_count(df, index, row, 'phone_number', counts)
-            elif not pd.isnull(row['website']):
-                counts = match_field_count(df, index, row, 'website', counts)
             else:
                 print("no match for {} on company name, phone number and website".format())       
                           
-            # if there is more than one location and "Organisatie" as marked segment, update with correct segment
-            if (counts[index] > 1) and (str(row['marked_segment']) == 'Organisatie'):
-                # update marked segment in hooflocatie (based on phone number match..)
-                update_marked_segment_main_location(df, index, row)
+            # # if there is more than one location and "Organisatie" as marked segment, update with correct segment
+            # if (counts[index] > 1) and (str(row['marked_segment']) == 'Organisatie'):
+            #     # update marked segment in hooflocatie (based on phone number match..)
+            #     update_marked_segment_main_location(df, index, row)
 
     # Convert the dictionary to a Series and assign it to the DataFrame
     df['nr_of_locations'] = pd.Series(counts)
@@ -104,18 +110,37 @@ def drop_non_main_locations(df):
     df.drop('is_main_location', axis=1, inplace=True)
     return df
 
+def clean_website(df):
+    # Ensure the 'website' column is of type string
+    df['website'] = df['website'].astype(str)
+
+    # Remove 'http://' or 'https://'
+    df['website'] = df['website'].str.replace(r'^https?://', '', regex=True)
+
+    # Remove 'www.'
+    df['website'] = df['website'].str.replace(r'^www\.', '', regex=True)
+
+    # Extract the root domain
+    df['website'] = df['website'].str.extract(r'([a-zA-Z0-9-]+\.[a-zA-Z]+)', expand=False)
+
+    return df
     
 def main():
-    file_in = 'output.csv'
-    file_out = 'output_processed.csv'
+    file_name = 'output'
+    output_id = "_website_count"
+
+    file_in = file_name + ".csv"
+    file_out = file_name + output_id +'_processed.csv'
     
     df = pd.read_csv(file_in)
     
     remove_website_from_phone_nr(df)
     
     clean_phone_number(df)
+
+    df = clean_website(df)
     
-    add_is_main_location_column(df, is_main_location_in_company)
+    add_is_main_location_column(df, is_main_location_based_on_company_name)
     
     add_locations_column_and_update_marked_segment(df)
     
