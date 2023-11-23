@@ -146,8 +146,6 @@ def update_main_location(df):
                 else:
                     df.at[associated_row.name, 'is_main_location'] = False
 
-
-
 def keep_unique_field_with_shortest_company_name(df, field):
         # DataFrame with non-NaN and non-empty 'website' values
     df_without_nan = df[df[field].notna() & (df[field] != '')]
