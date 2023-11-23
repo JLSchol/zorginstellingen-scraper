@@ -47,9 +47,14 @@ def drop_duplicates_based_on_unique(df, field):
     df_result = pd.concat([df_unique, df_with_nan])
     
     return df_result
+
+def prepend_www_to_website(df):
+    df['website'] = df['website'].apply(lambda x: f'www.{x}' if pd.notnull(x) else x)
+
+
+
 def main():
-    # file_name = 'output'
-    # output_id = "_website_count"
+
     file_name = 'output'
     output_id = ""
 
@@ -67,9 +72,9 @@ def main():
 
     df = drop_duplicates_based_on_unique(df, 'website')
 
-    print(df)
+    prepend_www_to_website(df)
 
-
+    print(df.head())
 
 
     df.to_csv(file_out, index=False)
